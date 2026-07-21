@@ -222,12 +222,12 @@ ul {
   height: calc(100svh - 154px);
   min-height: 680px;
   overflow: hidden;
-  padding: 0 84px 100px 0;
+  padding: 0 0 100px;
 }
 
 .scene-panel {
   position: absolute;
-  inset: 0 84px 100px 0;
+  inset: 0 0 100px;
   padding: 34px;
   border: 1px solid var(--line);
   border-radius: 34px;
@@ -437,7 +437,6 @@ ul {
 
 .profile-card {
   display: grid;
-  grid-template-columns: minmax(0, 413px) minmax(220px, 1fr);
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -446,40 +445,12 @@ ul {
   align-self: start;
 }
 
-.profile-portrait {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  width: 100%;
-  max-width: 413px;
-  aspect-ratio: 413 / 531;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at top, rgba(248, 95, 57, 0.18), transparent 52%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
-    linear-gradient(135deg, rgba(248, 95, 57, 0.12), rgba(31, 99, 255, 0.08));
-}
-
-.profile-portrait img {
-  width: 100%;
-  height: 100%;
-  max-height: none;
-  object-fit: contain;
-  object-position: center top;
-  border-radius: 0;
-  background: transparent;
-  padding: 0;
-  box-shadow: none;
-}
-
 .profile-content {
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding: 18px 18px 16px 14px;
+  padding: 24px;
 }
 
 .profile-content h2 {

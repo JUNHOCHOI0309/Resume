@@ -1,5 +1,3 @@
-import profileImage from '../assets/choijunho.jpg'
-
 export type Metric = {
   label: string
   value: string
@@ -79,7 +77,6 @@ export const portfolio = {
     'Multi_FC / 풋살 웹사이트 팀 프로젝트',
     'MMKorea / 대회 결제 웹사이트 설계 및 구현',
   ],
-  profileImage,
 }
 
 export const experiences: Experience[] = [

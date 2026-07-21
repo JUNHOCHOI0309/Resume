@@ -119,7 +119,8 @@ function App() {
 
       return {
         opacity: Math.max(0.62, 1 - distance * 0.1),
-        transform: `translate3d(${distance * 18}px, ${distance * 22}px, 0) scale(${Math.max(0.9, 1 - distance * 0.024)})`,
+        transform: `translate3d(0, ${distance * 22}px, 0) scale(${Math.max(0.9, 1 - distance * 0.024)})`,
+        transformOrigin: 'center top',
         filter: `brightness(${Math.max(0.82, 1 - distance * 0.05)})`,
         pointerEvents: distance === 0 ? 'auto' : 'none',
         zIndex: 10 - distance,
@@ -275,42 +276,7 @@ function App() {
               </div>
 
               <div className="scene-body scene-scroll-body about-body" data-scene-scroll="true">
-                <div className="about-copy-group">
-                  <article className="info-card narrative-card">
-                    <div className="paragraph-stack">
-                      {portfolio.about.slice(0, 2).map((paragraph) => (
-                        <p key={paragraph}>{paragraph}</p>
-                      ))}
-                    </div>
-                  </article>
-
-                  <div className="hero-actions">
-                    <button
-                      className="button button-primary"
-                      onClick={() => jumpToSection(2)}
-                      type="button"
-                    >
-                      View Experience
-                    </button>
-                    <a
-                      className="button button-secondary"
-                      href={portfolio.github}
-                      rel="noreferrer"
-                      target="_blank"
-                    >
-                      GitHub
-                    </a>
-                  </div>
-                </div>
-
                 <article className="profile-card">
-                  <div className="profile-portrait">
-                    <img
-                      alt={`${portfolio.name} profile portrait`}
-                      src={portfolio.profileImage}
-                    />
-                  </div>
-
                   <div className="profile-content">
                     <p className="profile-kicker">Profile</p>
                     <h2>
@@ -337,6 +303,37 @@ function App() {
                     </ul>
                   </div>
                 </article>
+
+                <div className="about-copy-group">
+                  <article className="info-card narrative-card">
+                    <div className="paragraph-stack">
+                      {portfolio.about.slice(0, 2).map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
+                      <p>
+                        기획부터 구현, 배포까지 이어지는 과정에서 사용자의 실제 흐름과 운영 관점을 함께 고민합니다.
+                      </p>
+                    </div>
+                  </article>
+
+                  <div className="hero-actions">
+                    <button
+                      className="button button-primary"
+                      onClick={() => jumpToSection(2)}
+                      type="button"
+                    >
+                      View Experience
+                    </button>
+                    <a
+                      className="button button-secondary"
+                      href={portfolio.github}
+                      rel="noreferrer"
+                      target="_blank"
+                    >
+                      GitHub
+                    </a>
+                  </div>
+                </div>
 
                 <dl className="metric-grid about-metrics">
                   {portfolio.metrics.map((metric) => (
