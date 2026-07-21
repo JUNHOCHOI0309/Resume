@@ -1,15 +1,9 @@
 import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { experiences, portfolio, skillGroups } from './data/portfolio'
 
-type DirectionVector = {
-  x: number
-  y: number
-}
-
 type TransitionState = {
   from: number
   to: number
-  vector: DirectionVector
   phase: 'pre' | 'running'
 }
 
@@ -21,14 +15,7 @@ const sceneItems = [
   { id: 'contact', label: 'Contact', indexLabel: '05' },
 ] as const
 
-const transitionVectors: DirectionVector[] = [
-  { x: 1, y: 0 },
-  { x: 0, y: 1 },
-  { x: 1, y: 0 },
-  { x: 0, y: -1 },
-]
-
-const motionDurationMs = 860
+const motionDurationMs = 760
 const wheelThreshold = 120
 const wheelResetDelay = 220
 
@@ -39,8 +26,6 @@ function App() {
   const wheelBufferRef = useRef(0)
   const wheelResetTimeoutRef = useRef<number | null>(null)
   const transitionTimeoutRef = useRef<number | null>(null)
-  const reduceMotionQueryRef = useRef<MediaQueryList | null>(null)
-
   const [activeIndex, setActiveIndex] = useState(0)
   const [transition, setTransition] = useState<TransitionState | null>(null)
 
@@ -58,19 +43,6 @@ function App() {
     setActiveIndex(nextIndex)
     setTransition(null)
     isAnimatingRef.current = false
-  }
-
-  const getVectorForMove = (fromIndex: number, toIndex: number): DirectionVector => {
-    if (toIndex > fromIndex) {
-      return transitionVectors[Math.min(fromIndex, transitionVectors.length - 1)]
-    }
-
-    if (toIndex < fromIndex) {
-      const baseVector = transitionVectors[Math.max(0, toIndex)]
-      return { x: -baseVector.x, y: -baseVector.y }
-    }
-
-    return { x: 0, y: 0 }
   }
 
   const moveToSection = (nextIndex: number) => {
@@ -92,15 +64,7 @@ function App() {
     }
 
     isAnimatingRef.current = true
-
-    const vector = getVectorForMove(currentIndex, nextIndex)
-
-    setTransition({
-      from: currentIndex,
-      to: nextIndex,
-      vector,
-      phase: 'pre',
-    })
+    setTransition({ from: currentIndex, to: nextIndex, phase: 'pre' })
 
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
@@ -117,6 +81,7 @@ function App() {
 
     transitionTimeoutRef.current = window.setTimeout(() => {
       finishTransition(nextIndex)
+      transitionTimeoutRef.current = null
     }, motionDurationMs)
   }
 
@@ -126,22 +91,13 @@ function App() {
     }
 
     if (window.innerWidth < 1024) {
-      sectionRefs.current[nextIndex]?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
-      })
+      sectionRefs.current[nextIndex]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       return
     }
 
     if (Math.abs(nextIndex - activeIndexRef.current) > 1) {
       clearWheelBuffer()
-
-      if (transitionTimeoutRef.current !== null) {
-        window.clearTimeout(transitionTimeoutRef.current)
-      }
-
       setTransition(null)
-      isAnimatingRef.current = false
       activeIndexRef.current = nextIndex
       setActiveIndex(nextIndex)
       return
@@ -151,69 +107,67 @@ function App() {
   }
 
   const getPanelStyle = (index: number): CSSProperties => {
-    const hiddenStyle: CSSProperties = {
-      opacity: 0,
-      transform: 'translate3d(0, 0, 0) scale(0.985)',
-      filter: 'blur(18px)',
-      pointerEvents: 'none',
-      zIndex: 0,
-    }
-
-    const activeStyle: CSSProperties = {
-      opacity: 1,
-      transform: 'translate3d(0, 0, 0) scale(1)',
-      filter: 'blur(0px)',
-      pointerEvents: 'auto',
-      zIndex: 3,
-    }
-
-    if (!transition) {
-      return index === activeIndex ? activeStyle : hiddenStyle
-    }
-
-    if (index === transition.from) {
-      if (transition.phase === 'pre') {
+    const getStackStyle = (distance: number): CSSProperties => {
+      if (distance < 0) {
         return {
-          ...activeStyle,
-          zIndex: 2,
+          opacity: 0,
+          transform: 'translate3d(0, -112%, 0) rotate(-1.5deg)',
+          pointerEvents: 'none',
+          zIndex: 0,
         }
       }
 
       return {
-        opacity: 0,
-        transform: `translate3d(${-transition.vector.x * 18}%, ${-transition.vector.y * 18}%, 0) scale(0.94)`,
-        filter: 'blur(18px)',
-        pointerEvents: 'none',
-        zIndex: 2,
+        opacity: Math.max(0.62, 1 - distance * 0.1),
+        transform: `translate3d(${distance * 18}px, ${distance * 22}px, 0) scale(${Math.max(0.9, 1 - distance * 0.024)})`,
+        filter: `brightness(${Math.max(0.82, 1 - distance * 0.05)})`,
+        pointerEvents: distance === 0 ? 'auto' : 'none',
+        zIndex: 10 - distance,
       }
     }
 
-    if (index === transition.to) {
+    if (!transition) {
+      return getStackStyle(index - activeIndex)
+    }
+
+    const isMovingForward = transition.to > transition.from
+
+    if (index === transition.from) {
       if (transition.phase === 'pre') {
-        return {
-          opacity: 1,
-          transform: `translate3d(${transition.vector.x * 108}%, ${transition.vector.y * 108}%, 0) scale(1)`,
-          filter: 'blur(0px)',
-          pointerEvents: 'none',
-          zIndex: 3,
-        }
+        return getStackStyle(0)
       }
 
-      return activeStyle
+      return {
+        opacity: 0,
+        transform: isMovingForward
+          ? 'translate3d(0, -118%, 0) rotate(-2deg)'
+          : 'translate3d(0, 118%, 0) rotate(2deg)',
+        filter: 'blur(8px)',
+        pointerEvents: 'none',
+        zIndex: 12,
+      }
     }
 
-    return hiddenStyle
+    if (index === transition.to && !isMovingForward && transition.phase === 'pre') {
+      return {
+        opacity: 0,
+        transform: 'translate3d(0, -112%, 0) rotate(-1.5deg)',
+        pointerEvents: 'none',
+        zIndex: 11,
+      }
+    }
+
+    const distance =
+      transition.phase === 'pre' && isMovingForward
+        ? index - transition.from
+        : index - transition.to
+
+    return getStackStyle(distance)
   }
 
   useEffect(() => {
-    reduceMotionQueryRef.current = window.matchMedia('(prefers-reduced-motion: reduce)')
-
     const handleWheel = (event: WheelEvent) => {
-      if (
-        reduceMotionQueryRef.current?.matches ||
-        window.innerWidth < 1024 ||
-        Math.abs(event.deltaY) < 10
-      ) {
+      if (window.innerWidth < 1024 || Math.abs(event.deltaY) < 10) {
         return
       }
 
@@ -222,11 +176,7 @@ function App() {
       )
 
       if (scrollRegion) {
-        const remainingDown =
-          scrollRegion.scrollHeight -
-          scrollRegion.clientHeight -
-          scrollRegion.scrollTop
-
+        const remainingDown = scrollRegion.scrollHeight - scrollRegion.clientHeight - scrollRegion.scrollTop
         const canScrollDown = event.deltaY > 0 && remainingDown > 4
         const canScrollUp = event.deltaY < 0 && scrollRegion.scrollTop > 4
 
@@ -247,50 +197,24 @@ function App() {
         window.clearTimeout(wheelResetTimeoutRef.current)
       }
 
-      wheelResetTimeoutRef.current = window.setTimeout(() => {
-        wheelBufferRef.current = 0
-        wheelResetTimeoutRef.current = null
-      }, wheelResetDelay)
+      wheelResetTimeoutRef.current = window.setTimeout(clearWheelBuffer, wheelResetDelay)
 
       if (Math.abs(wheelBufferRef.current) < wheelThreshold) {
         return
       }
 
-      const direction = wheelBufferRef.current > 0 ? 1 : -1
-      const nextIndex = Math.min(
-        sceneItems.length - 1,
-        Math.max(0, activeIndexRef.current + direction),
+      moveToSection(
+        Math.min(
+          sceneItems.length - 1,
+          Math.max(0, activeIndexRef.current + (wheelBufferRef.current > 0 ? 1 : -1)),
+        ),
       )
-
-      moveToSection(nextIndex)
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (
-        reduceMotionQueryRef.current?.matches ||
-        window.innerWidth < 1024 ||
-        isAnimatingRef.current
-      ) {
-        return
-      }
-
-      if (event.key === 'ArrowDown' || event.key === 'PageDown' || event.key === ' ') {
-        event.preventDefault()
-        moveToSection(Math.min(sceneItems.length - 1, activeIndexRef.current + 1))
-      }
-
-      if (event.key === 'ArrowUp' || event.key === 'PageUp') {
-        event.preventDefault()
-        moveToSection(Math.max(0, activeIndexRef.current - 1))
-      }
     }
 
     window.addEventListener('wheel', handleWheel, { passive: false })
-    window.addEventListener('keydown', handleKeyDown)
 
     return () => {
       window.removeEventListener('wheel', handleWheel)
-      window.removeEventListener('keydown', handleKeyDown)
       clearWheelBuffer()
 
       if (transitionTimeoutRef.current !== null) {
@@ -496,8 +420,8 @@ function App() {
                 <p className="scene-kicker">Section 03 / Experience</p>
                 <h2 className="scene-heading">맡은 역할과 구현 범위가 분명하게 보이는 프로젝트 기록</h2>
                 <p className="scene-description">
-                  이 섹션은 내부 스크롤이 가능하며, 카드 내용을 충분히 본 뒤 다음
-                  섹션으로 넘어가도록 구성했습니다.
+                  프로젝트 전체 내용을 한 흐름으로 확인한 뒤 다음 섹션으로 자연스럽게
+                  이어집니다.
                 </p>
               </div>
 
@@ -515,7 +439,19 @@ function App() {
                       <div className="experience-topline">
                         <div>
                           <p className="experience-period">{experience.period}</p>
-                          <h3>{experience.name}</h3>
+                          <h3>
+                            {experience.name}
+                            {experience.url && (
+                              <a
+                                className="experience-link"
+                                href={experience.url}
+                                rel="noreferrer"
+                                target="_blank"
+                              >
+                                {experience.urlLabel}
+                              </a>
+                            )}
+                          </h3>
                           <p className="experience-role">{experience.role}</p>
                         </div>
                         <span className="timeline-badge">Project</span>

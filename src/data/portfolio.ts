@@ -12,6 +12,8 @@ export type Principle = {
 
 export type Experience = {
   name: string
+  url?: string
+  urlLabel?: string
   period: string
   role: string
   summary: string
@@ -83,6 +85,8 @@ export const portfolio = {
 export const experiences: Experience[] = [
   {
     name: 'MMKorea',
+    url: 'https://mmkorea.com',
+    urlLabel: 'mmkorea.com',
     period: '2026.04 - 2026.06',
     role: '대회 결제 웹 사이트 / 기획 및 풀스택',
     summary:
@@ -109,6 +113,8 @@ export const experiences: Experience[] = [
   },
   {
     name: 'Hack-n-Learn',
+    url: 'https://hacknlearn.site',
+    urlLabel: 'hacknlearn.site',
     period: '2025.09 - 2025.12',
     role: '해킹 실습 웹 사이트 / 백엔드 담당, 빌드 및 배포',
     summary:
@@ -122,6 +128,8 @@ export const experiences: Experience[] = [
   },
   {
     name: 'Project_suika',
+    url: 'https://project-suika-que8.vercel.app',
+    urlLabel: 'project-suika-que8.vercel.app',
     period: '2025.08 - 현재',
     role: '웹 기반 수박 게임 / 게임 로직 구현 및 백엔드 구성',
     summary:

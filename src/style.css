@@ -222,6 +222,13 @@ ul {
   height: calc(100svh - 154px);
   min-height: 680px;
   overflow: hidden;
+  padding: 0 84px 100px 0;
+}
+
+.scene-panel {
+  position: absolute;
+  inset: 0 84px 100px 0;
+  padding: 34px;
   border: 1px solid var(--line);
   border-radius: 34px;
   background:
@@ -229,14 +236,8 @@ ul {
     rgba(255, 250, 244, 0.64);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow);
-}
-
-.scene-panel {
-  position: absolute;
-  inset: 0;
-  padding: 34px;
   transition:
-    transform 860ms cubic-bezier(0.2, 0.9, 0.15, 1),
+    transform 760ms cubic-bezier(0.2, 0.9, 0.15, 1),
     opacity 560ms ease,
     filter 560ms ease;
   will-change: transform, opacity, filter;
@@ -264,7 +265,7 @@ ul {
 
 .scene-scroll-body {
   overflow: auto;
-  padding-right: 0;
+  padding-right: 6px;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -436,9 +437,7 @@ ul {
 
 .profile-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.18fr) minmax(220px, 0.82fr);
-  min-height: 452px;
-  max-height: 452px;
+  grid-template-columns: minmax(0, 413px) minmax(220px, 1fr);
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -451,8 +450,12 @@ ul {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  min-height: 100%;
+  width: 100%;
+  max-width: 413px;
+  aspect-ratio: 413 / 531;
+  min-height: 0;
   padding: 0;
+  overflow: hidden;
   background:
     radial-gradient(circle at top, rgba(248, 95, 57, 0.18), transparent 52%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
@@ -463,7 +466,7 @@ ul {
   width: 100%;
   height: 100%;
   max-height: none;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center top;
   border-radius: 0;
   background: transparent;
@@ -604,8 +607,8 @@ ul {
   display: grid;
   gap: 14px;
   min-height: 0;
-  padding-right: 0;
   overflow: auto;
+  padding-right: 6px;
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
@@ -638,6 +641,23 @@ ul {
   font-family: var(--display);
   font-size: 1.34rem;
   letter-spacing: -0.04em;
+}
+
+.experience-link {
+  display: inline-flex;
+  margin-left: 10px;
+  color: var(--blue);
+  font-family: var(--sans);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.experience-link:hover,
+.experience-link:focus-visible {
+  color: var(--accent);
 }
 
 .experience-role {
@@ -768,12 +788,6 @@ ul {
     padding-top: 12px;
   }
 
-  .site-bar {
-    position: sticky;
-    top: 12px;
-    z-index: 10;
-  }
-
   .section-stage {
     height: auto;
     min-height: 0;
@@ -782,21 +796,17 @@ ul {
   }
 
   .scene-panel {
-    position: static;
+    position: relative;
+    inset: auto;
+    min-height: 0;
     padding: 22px;
     margin-bottom: 14px;
-    border: 1px solid var(--line);
     border-radius: 26px;
-    background: rgba(255, 251, 246, 0.84);
-    box-shadow: 0 16px 40px rgba(41, 53, 69, 0.08);
+    box-shadow: var(--shadow);
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
     pointer-events: auto !important;
-  }
-
-  .scene-panel:last-of-type {
-    margin-bottom: 0;
   }
 
   .scene-about-grid,
@@ -816,8 +826,8 @@ ul {
     grid-template-columns: 1fr;
   }
 
+  .scene-scroll-body,
   .experience-scroll {
-    max-height: none;
     overflow: visible;
     padding-right: 0;
   }
