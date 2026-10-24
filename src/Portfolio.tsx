@@ -6,6 +6,7 @@ import { getMetadata } from './lib/metadata'
 import { ProjectCard, ProjectContribution, ProjectVisual } from './components/ProjectCard'
 import LandingHero from './components/LandingHero'
 import AIUsage from './components/AIUsage'
+import StarBackdrop from './components/StarBackdrop'
 
 const navigation = [
   { id: 'work', name: '포트폴리오', english: 'Work' },
@@ -516,7 +517,8 @@ function Site() {
   const main = useRef<HTMLElement>(null)
   useReveal(main, pathname)
   return (
-    <>
+    <div className="site-shell">
+      <StarBackdrop />
       <a className="skip-link" href="#main">
         본문으로 바로가기
       </a>
@@ -533,7 +535,7 @@ function Site() {
       </main>
       <Footer />
       <BackToTop />
-    </>
+    </div>
   )
 }
 

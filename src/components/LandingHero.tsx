@@ -23,7 +23,7 @@ export default function LandingHero() {
       if (window.scrollY > 80) setComplete(true)
     }
     // A slow or unavailable renderer must never hold up the introduction.
-    const deadline = window.setTimeout(() => setComplete(true), 9000)
+    const deadline = window.setTimeout(() => setComplete(true), 12000)
     window.addEventListener('scroll', skipOnScroll, { passive: true })
     return () => {
       window.clearTimeout(deadline)
@@ -62,9 +62,11 @@ export default function LandingHero() {
           <span>최준호</span>
         </h1>
         <p className="hero-description">
-          웹사이트와 앱을 개발합니다.
+          항상 새로운 것을 추구하고, 발전해 나가는 개발자입니다.
           <br />
-          대회 신청·결제, 투표 서비스, 뉴스 사이트 등을 만들었습니다.
+          주로 웹사이트와 앱을 개발해 나갑니다.
+          <br />
+          아이디어를 실제로 사용할 수 있는 서비스로 만드는 데 관심이 있습니다.
         </p>
         <div className="hero-actions">
           <Link className="button button-primary" to="/#work">

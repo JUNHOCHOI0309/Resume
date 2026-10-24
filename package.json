@@ -8,6 +8,7 @@
     "build": "tsc && vite build && node scripts/prerender.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src scripts",
+    "test": "node --experimental-strip-types --test scripts/galaxy-motion.test.mjs scripts/starfield.test.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

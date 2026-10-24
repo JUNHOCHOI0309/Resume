@@ -38,6 +38,52 @@ body::before {
     radial-gradient(ellipse at 85% 12%, #21123644, transparent 55%),
     radial-gradient(ellipse at 0% 70%, #1d123c30, transparent 55%);
 }
+.site-shell {
+  position: relative;
+  isolation: isolate;
+}
+.star-backdrop {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.star-backdrop canvas,
+.star-backdrop-static {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.star-backdrop canvas {
+  opacity: 0.8;
+}
+.star-backdrop[data-mode='static'] canvas {
+  visibility: hidden;
+}
+.star-backdrop[data-mode='interactive'] .star-backdrop-static {
+  visibility: hidden;
+}
+.star-backdrop-static {
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1px 1px at 13% 24%, #b2d8f3 70%, transparent),
+    radial-gradient(1.5px 1.5px at 67% 71%, #e0efff 60%, transparent),
+    radial-gradient(1px 1px at 44% 36%, #9dc1e8 70%, transparent),
+    radial-gradient(1px 1px at 89% 12%, #e6b98c 70%, transparent);
+  background-size:
+    387px 319px,
+    563px 487px,
+    257px 401px,
+    463px 283px;
+}
+.star-backdrop::after {
+  position: absolute;
+  content: '';
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, #09090f99, #09090f66 55%, transparent 95%);
+}
 ::selection {
   background: #9674ed;
   color: white;
@@ -350,8 +396,27 @@ ol {
 .art-glow {
   position: absolute;
   inset: 12%;
-  background: radial-gradient(ellipse, #8e4dff18, transparent 67%);
-  filter: blur(25px);
+  pointer-events: none;
+  background: radial-gradient(ellipse, #a3d4ed18, #294d6b0a 35%, transparent 65%);
+  filter: blur(18px);
+}
+.galaxy-renderer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.galaxy-interaction {
+  position: absolute;
+  z-index: 2;
+  inset: 8% 4% 12%;
+  width: 92%;
+  background: transparent;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.galaxy-interaction:active {
+  cursor: grabbing;
 }
 .static-art {
   position: absolute;
@@ -728,7 +793,7 @@ ol {
 }
 .ai-usage-section {
   position: relative;
-  background: #0d0d12;
+  background: #0d0d1273;
   border-block: 1px solid var(--line);
 }
 .ai-usage-section .section-heading > p {
@@ -2035,9 +2100,9 @@ summary {
 }
 .hero.is-opening .hero-art {
   left: 50%;
-  top: 38%;
-  width: min(100%, 1050px);
-  height: 76%;
+  top: 41%;
+  width: 100%;
+  height: 96%;
   max-height: none;
   transform: translate(-50%, -50%);
   opacity: 1;
@@ -2481,7 +2546,7 @@ summary {
     font-size: 18px;
   }
   .hero {
-    min-height: 1020px;
+    min-height: max(830px, calc(100svh - 84px));
     padding-bottom: 390px;
   }
   .hero .hero-art {
@@ -2497,8 +2562,10 @@ summary {
     padding-block: 0;
   }
   .hero.is-opening .hero-art {
-    top: 35%;
-    height: 70%;
+    top: 38%;
+    width: 140%;
+    max-width: none;
+    height: 76%;
     bottom: auto;
     transform: translate(-50%, -50%);
   }

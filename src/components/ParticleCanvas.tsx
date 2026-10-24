@@ -1,100 +1,122 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { AdditiveBlending, ShaderMaterial, Vector2, type Points } from 'three'
+import {
+  AdditiveBlending,
+  DynamicDrawUsage,
+  Matrix4,
+  ShaderMaterial,
+  type BufferAttribute,
+  type Points,
+} from 'three'
+import { createGalaxy } from '../lib/galaxy'
+import {
+  GALAXY_FLOW,
+  createGalaxyMotion,
+  stepGalaxyMotion,
+  type GalaxyPointer,
+  type GalaxyRotation,
+} from '../lib/galaxyMotion'
 
 const vertexShader = `
   uniform float uTime;
+  uniform float uAssembly;
   uniform float uProgress;
-  uniform float uMorph;
-  uniform vec2 uPointer;
+  uniform float uDpr;
+  attribute vec2 aOffset;
   attribute float aSeed;
-  attribute vec3 aCloud;
-  attribute vec3 aSphere;
-  attribute vec3 aPlane;
+  attribute float aRadius;
+  attribute float aSize;
+  attribute float aBackground;
+  attribute float aCore;
   varying float vSeed;
-  varying float vDepth;
+  varying float vAlpha;
+  varying float vBackground;
+  varying float vCore;
+  varying float vMotion;
   void main() {
     vSeed = aSeed;
-    vec3 p;
-    if (uMorph < 1.) p = mix(aCloud, aSphere, smoothstep(0., 1., uMorph));
-    else if (uMorph < 2.) p = mix(aSphere, aPlane, smoothstep(1., 2., uMorph));
-    else p = mix(aPlane, position, smoothstep(2., 3., uMorph));
-    p += normalize(p) * sin(uTime * .65 + aSeed * 30.) * .045;
-    p += vec3(sin(aSeed*35.), cos(aSeed*52.), sin(aSeed*71.)) * uProgress * 1.7;
-    vec2 difference = p.xy - uPointer * 2.6;
-    float repel = exp(-dot(difference, difference) * 2.5);
-    p.xy += normalize(difference + .001) * repel * .28;
+    vBackground = aBackground;
+    vCore = aCore;
+    vec3 p = position;
+    if (aBackground < .5) {
+      float angle = uTime * ${GALAXY_FLOW.spin} / (.4 + aRadius)
+        + (1. - uAssembly) * (1. - aRadius) * ${GALAXY_FLOW.assemblyTwist.toFixed(1)};
+      p.xy = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * p.xy;
+      p *= mix(${GALAXY_FLOW.startScale}, 1., uAssembly);
+      p.z += sin(uTime * ${GALAXY_FLOW.wobbleSpeed} + aSeed * ${GALAXY_FLOW.wobblePhase.toFixed(1)}) * ${GALAXY_FLOW.wobble};
+      p += normalize(position + .001) * uProgress * aRadius * ${GALAXY_FLOW.scatter};
+      vAlpha = 1. - smoothstep(uAssembly * 1.4 - .35, uAssembly * 1.4 + .08, aRadius);
+    } else {
+      vAlpha = .35 + .35 * sin(uTime * .35 + aSeed * 50.);
+    }
+    vAlpha *= .78 + .22 * sin(uTime * (1. + aSeed) + aSeed * 60.);
     vec4 mvPosition = modelViewMatrix * vec4(p, 1.);
-    vDepth = clamp((-mvPosition.z - 3.) / 7., 0., 1.);
-    gl_PointSize = clamp((14. + aSeed * 24.) / -mvPosition.z, 1., 7.);
+    vMotion = smoothstep(.001, .14, length(aOffset));
+    gl_PointSize = aCore > .5 ? 180. * uDpr * 8. / max(2., -mvPosition.z)
+      : clamp(aSize * uDpr * 8. / max(2., -mvPosition.z), 1.5, 42.);
     gl_Position = projectionMatrix * mvPosition;
+    gl_Position.xy += aOffset * gl_Position.w;
   }
 `
+
 const fragmentShader = `
   varying float vSeed;
-  varying float vDepth;
+  varying float vAlpha;
+  varying float vBackground;
+  varying float vCore;
+  varying float vMotion;
   void main() {
-    float d = length(gl_PointCoord - .5) * 2.;
-    if (d > 1.) discard;
-    float halo = pow(1. - d, 2.);
-    vec3 violet = mix(vec3(.38,.18,.88), vec3(.82,.65,1.), vSeed);
-    vec3 color = mix(violet, vec3(.97,.93,1.), pow(vSeed, 5.));
-    gl_FragColor = vec4(color * 1.45, halo * (1. - vDepth * .35));
+    vec2 uv = gl_PointCoord - .5;
+    float radius = length(uv) * 2.;
+    if (radius > 1.) discard;
+    if (vCore > .5) {
+      float glow = exp(-radius * radius * 28.) * .7 + exp(-radius * 6.) * .25;
+      gl_FragColor = vec4(vec3(.78, .89, 1.) * 1.8, glow * vAlpha);
+      return;
+    }
+    float halo = exp(-radius * 5.) * .5;
+    float core = exp(-radius * radius * 32.) * 1.5;
+    float rays = (exp(-abs(uv.x) * 95.) * exp(-abs(uv.y) * 16.)
+      + exp(-abs(uv.y) * 95.) * exp(-abs(uv.x) * 16.))
+      * smoothstep(.94, 1., vSeed) * .13;
+    vec3 blue = mix(vec3(.28, .57, .88), vec3(.77, .91, 1.), vSeed);
+    vec3 gold = mix(vec3(.87, .39, .16), vec3(1., .85, .63), vSeed);
+    vec3 color = mix(blue, gold, step(.78, fract(vSeed * 17.)));
+    color = mix(color, vec3(.91, .96, 1.), smoothstep(.92, 1., vSeed));
+    float alpha = (core + halo + rays) * vAlpha;
+    gl_FragColor = vec4(color * (1.35 - vBackground * .35 + vMotion * .35), alpha);
   }
 `
 
 type IntroProps = { opening: boolean; onStage: (stage: number) => void; onComplete: () => void }
+type Rotation = RefObject<GalaxyRotation>
+type Pointer = RefObject<GalaxyPointer>
 
-function ParticleField({
+function GalaxyField({
   progress,
+  rotation,
+  pointer,
   compact,
   opening,
   onStage,
   onComplete,
-}: { progress: RefObject<number>; compact: boolean } & IntroProps) {
+}: {
+  progress: RefObject<number>
+  rotation: Rotation
+  pointer: Pointer
+  compact: boolean
+} & IntroProps) {
   const points = useRef<Points>(null)
+  const offsets = useRef<BufferAttribute>(null)
   const elapsed = useRef(0)
   const lastStage = useRef(-1)
   const finished = useRef(false)
-  const [field] = useState(() => {
-    const count = compact ? 1600 : 6000
-    const positions = new Float32Array(count * 3)
-    const cloud = new Float32Array(count * 3)
-    const sphere = new Float32Array(count * 3)
-    const plane = new Float32Array(count * 3)
-    const seeds = new Float32Array(count)
-    let seed = 8701
-    const random = () => {
-      seed = (seed * 16807) % 2147483647
-      return (seed - 1) / 2147483646
-    }
-    for (let i = 0; i < count; i++) {
-      const t = random() * Math.PI * 2
-      const edge = random() * Math.PI * 2
-      const width = 0.08 + random() * 0.23
-      // A braided orbital knot: each point follows the same curve with a small radial offset.
-      positions[i * 3] = (2 + Math.cos(3 * t)) * Math.cos(2 * t) * 0.67 + Math.cos(edge) * width
-      positions[i * 3 + 1] = (2 + Math.cos(3 * t)) * Math.sin(2 * t) * 0.67 + Math.sin(edge) * width
-      positions[i * 3 + 2] = Math.sin(3 * t) * 0.72 + (random() - 0.5) * width
-      const latitude = Math.acos(1 - (2 * (i + 0.5)) / count)
-      const longitude = i * 2.399963
-      sphere[i * 3] = Math.sin(latitude) * Math.cos(longitude) * 1.85
-      sphere[i * 3 + 1] = Math.cos(latitude) * 1.85
-      sphere[i * 3 + 2] = Math.sin(latitude) * Math.sin(longitude) * 1.85
-      const radius = Math.cbrt(random()) * 3.1
-      cloud[i * 3] = Math.sin(latitude) * Math.cos(t) * radius
-      cloud[i * 3 + 1] = Math.cos(latitude) * radius
-      cloud[i * 3 + 2] = Math.sin(latitude) * Math.sin(t) * radius
-      const columns = Math.ceil(Math.sqrt(count))
-      const x = ((i % columns) / columns - 0.5) * 4.8
-      const y = (Math.floor(i / columns) / columns - 0.5) * 3.3
-      plane[i * 3] = x
-      plane[i * 3 + 1] = y
-      plane[i * 3 + 2] = Math.sin(x * 1.7) * Math.cos(y * 1.7) * 0.75
-      seeds[i] = random()
-    }
-    return { positions, seeds, cloud, sphere, plane }
-  })
+  const wasOpening = useRef(opening)
+  const [field] = useState(() => createGalaxy(compact))
+  const [motion] = useState(() => createGalaxyMotion(field.seeds.length))
+  const [projection] = useState(() => new Matrix4())
+  const scrollCooldown = useRef(0)
+  const lastProgress = useRef(progress.current)
   const [material] = useState(
     () =>
       new ShaderMaterial({
@@ -105,44 +127,84 @@ function ParticleField({
         blending: AdditiveBlending,
         uniforms: {
           uTime: { value: 0 },
+          uAssembly: { value: opening ? 0 : 1 },
           uProgress: { value: 0 },
-          uMorph: { value: 0 },
-          uPointer: { value: new Vector2(10, 10) },
+          uDpr: { value: 1 },
         },
       }),
   )
   useEffect(() => () => material.dispose(), [material])
   useFrame((state, delta) => {
+    const step = Math.min(delta, 0.05)
+    if (opening && !wasOpening.current) {
+      elapsed.current = 0
+      finished.current = false
+      lastStage.current = -1
+    }
+    wasOpening.current = opening
     if (opening && !finished.current) {
-      elapsed.current += Math.min(delta, 0.05)
-      material.uniforms.uMorph.value = Math.min(3, elapsed.current / 1.65)
-      const stage = Math.min(2, Math.floor(elapsed.current / 1.65))
+      elapsed.current += step
+      material.uniforms.uAssembly.value = Math.min(1, elapsed.current / 5.2)
+      const stage = Math.min(2, Math.floor(elapsed.current / 2.2))
       if (stage !== lastStage.current) {
         lastStage.current = stage
         onStage(stage)
       }
-      if (elapsed.current >= 5.6) {
+      if (elapsed.current >= 7.2) {
         finished.current = true
         onComplete()
       }
-    } else material.uniforms.uMorph.value = 3
-    material.uniforms.uTime.value += Math.min(delta, 0.05)
+    } else material.uniforms.uAssembly.value = 1
+    material.uniforms.uTime.value += step
+    material.uniforms.uDpr.value = state.gl.getPixelRatio()
+    const damping = 1 - Math.exp(-delta * 5)
     material.uniforms.uProgress.value +=
-      (progress.current - material.uniforms.uProgress.value) * 0.05
-    material.uniforms.uPointer.value.lerp(state.pointer, 0.045)
+      (progress.current - material.uniforms.uProgress.value) * damping
     if (points.current) {
-      points.current.rotation.y += Math.min(delta, 0.05) * 0.065
-      points.current.rotation.x = 0.38 + Math.sin(material.uniforms.uTime.value * 0.12) * 0.08
+      const rotationDamping = 1 - Math.exp(-step * (rotation.current.returning ? 5.5 : 14))
+      points.current.rotation.x +=
+        (0.48 + rotation.current.x - points.current.rotation.x) * rotationDamping
+      points.current.rotation.y +=
+        (-0.18 + rotation.current.y - points.current.rotation.y) * rotationDamping
+      points.current.rotation.z = -0.3 + Math.sin(material.uniforms.uTime.value * 0.06) * 0.06
+      points.current.updateWorldMatrix(true, false)
+      projection.multiplyMatrices(state.camera.projectionMatrix, state.camera.matrixWorldInverse)
+      projection.multiply(points.current.matrixWorld)
+      scrollCooldown.current =
+        Math.abs(progress.current - lastProgress.current) > 0.0001
+          ? 0.15
+          : Math.max(0, scrollCooldown.current - step)
+      lastProgress.current = progress.current
+      const changed = stepGalaxyMotion(motion, field, {
+        delta: step,
+        time: material.uniforms.uTime.value,
+        assembly: material.uniforms.uAssembly.value,
+        progress: material.uniforms.uProgress.value,
+        width: state.size.width,
+        height: state.size.height,
+        matrix: projection.elements,
+        pointer: pointer.current,
+        scrolling:
+          scrollCooldown.current > 0 || performance.now() - pointer.current.lastScrollAt < 150,
+      })
+      if (changed && offsets.current) offsets.current.needsUpdate = true
     }
   })
   return (
-    <points ref={points} material={material} rotation={[0.38, 0, -0.32]}>
+    <points ref={points} material={material} rotation={[0.48, -0.18, -0.3]}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[field.positions, 3]} />
-        <bufferAttribute attach="attributes-aCloud" args={[field.cloud, 3]} />
-        <bufferAttribute attach="attributes-aSphere" args={[field.sphere, 3]} />
-        <bufferAttribute attach="attributes-aPlane" args={[field.plane, 3]} />
         <bufferAttribute attach="attributes-aSeed" args={[field.seeds, 1]} />
+        <bufferAttribute attach="attributes-aRadius" args={[field.radii, 1]} />
+        <bufferAttribute attach="attributes-aSize" args={[field.sizes, 1]} />
+        <bufferAttribute attach="attributes-aBackground" args={[field.background, 1]} />
+        <bufferAttribute attach="attributes-aCore" args={[field.core, 1]} />
+        <bufferAttribute
+          ref={offsets}
+          attach="attributes-aOffset"
+          args={[motion.offsets, 2]}
+          usage={DynamicDrawUsage}
+        />
       </bufferGeometry>
     </points>
   )
@@ -151,6 +213,8 @@ function ParticleField({
 export default function ParticleCanvas({
   visible,
   progress,
+  rotation,
+  pointer,
   onFailure,
   opening,
   onStage,
@@ -158,6 +222,8 @@ export default function ParticleCanvas({
 }: {
   visible: boolean
   progress: RefObject<number>
+  rotation: Rotation
+  pointer: Pointer
   onFailure: () => void
 } & IntroProps) {
   const [compact] = useState(() => window.innerWidth < 768 || navigator.hardwareConcurrency <= 4)
@@ -169,7 +235,7 @@ export default function ParticleCanvas({
   }, [])
   return (
     <Canvas
-      camera={{ position: [0, 0, 6.4], fov: 48 }}
+      camera={{ position: [0, 0, 8.2], fov: 46 }}
       dpr={[1, compact ? 1.25 : 1.5]}
       gl={{ antialias: false, alpha: true, powerPreference: 'low-power' }}
       frameloop={visible && pageVisible ? 'always' : 'never'}
@@ -178,8 +244,10 @@ export default function ParticleCanvas({
       }}
       fallback={<div />}
     >
-      <ParticleField
+      <GalaxyField
         progress={progress}
+        rotation={rotation}
+        pointer={pointer}
         compact={compact}
         opening={opening}
         onStage={onStage}
