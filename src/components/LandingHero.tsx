@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { profile } from '../data/content'
+import { GALAXY_INTRO, type HeroPhase } from '../lib/galaxyIntro'
 import { useMotion } from '../lib/motion'
 import HeroArt from './HeroArt'
 
@@ -9,34 +10,37 @@ const openingCopy = ['흩어진 생각이,', '하나의 구조가 되고,', '사
 export default function LandingHero() {
   const { enabled } = useMotion()
   const { hash } = useLocation()
-  const [complete, setComplete] = useState(false)
+  const [phase, setPhase] = useState<HeroPhase>('opening')
   const [stage, setStage] = useState(0)
-  const opening = enabled && !complete
+  const currentPhase = enabled ? phase : 'ready'
+  const opening = currentPhase === 'opening' || currentPhase === 'scattering'
+  const playing = currentPhase !== 'ready'
 
   useEffect(() => {
-    if (hash) setComplete(true)
-  }, [hash])
+    if (hash || !enabled) setPhase('ready')
+  }, [hash, enabled])
 
   useEffect(() => {
-    if (!opening) return
+    if (!playing) return
     const skipOnScroll = () => {
-      if (window.scrollY > 80) setComplete(true)
+      if (window.scrollY > 80) setPhase('ready')
     }
     // A slow or unavailable renderer must never hold up the introduction.
-    const deadline = window.setTimeout(() => setComplete(true), 12000)
+    const deadline = window.setTimeout(() => setPhase('ready'), GALAXY_INTRO.deadline)
     window.addEventListener('scroll', skipOnScroll, { passive: true })
     return () => {
       window.clearTimeout(deadline)
       window.removeEventListener('scroll', skipOnScroll)
     }
-  }, [opening])
+  }, [playing])
 
   return (
     <section
       className={`hero container ${opening ? 'is-opening' : 'is-ready'}`}
+      data-intro-phase={currentPhase}
       aria-labelledby="hero-title"
     >
-      <HeroArt opening={opening} onStage={setStage} onComplete={() => setComplete(true)} />
+      <HeroArt phase={currentPhase} onStage={setStage} onPhase={setPhase} />
       <div className="opening-copy" aria-hidden={!opening}>
         <span className="opening-label">CHOI JUN HO / FROM IDEA TO SERVICE</span>
         <p key={stage}>{openingCopy[stage]}</p>
@@ -48,7 +52,7 @@ export default function LandingHero() {
             </span>
           ))}
         </div>
-        <button className="opening-skip" onClick={() => setComplete(true)}>
+        <button className="opening-skip" onClick={() => setPhase('ready')}>
           건너뛰기
         </button>
       </div>

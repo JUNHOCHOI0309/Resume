@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { createGalaxy } from '../lib/galaxy'
+import type { HeroPhase } from '../lib/galaxyIntro'
 import { createGalaxyPointer, type GalaxyRotation } from '../lib/galaxyMotion'
 import { useMotion } from '../lib/motion'
 
@@ -71,13 +72,13 @@ function StaticArt() {
 }
 
 export default function HeroArt({
-  opening,
+  phase,
   onStage,
-  onComplete,
+  onPhase,
 }: {
-  opening: boolean
+  phase: HeroPhase
   onStage: (stage: number) => void
-  onComplete: () => void
+  onPhase: (phase: HeroPhase) => void
 }) {
   const { enabled } = useMotion()
   const container = useRef<HTMLDivElement>(null)
@@ -90,9 +91,10 @@ export default function HeroArt({
   const [failed, setFailed] = useState(false)
   const progress = useRef(0)
   const interactive = enabled && supported && !failed
+  const transitioning = phase === 'scattering' || phase === 'gathering'
 
   const trackPointer = (event: PointerEvent<HTMLDivElement>) => {
-    if (!interactive || !event.isPrimary) return
+    if (!interactive || transitioning || !event.isPrimary) return
     if (event.pointerType === 'touch' && !drag.current) return
     if (event.buttons && !drag.current) return
     const bounds = event.currentTarget.getBoundingClientRect()
@@ -172,12 +174,12 @@ export default function HeroArt({
   }, [])
 
   useEffect(() => {
-    if (opening && (supported === false || failed || !enabled)) onComplete()
-  }, [opening, supported, failed, enabled, onComplete])
+    if (phase !== 'ready' && (supported === false || failed || !enabled)) onPhase('ready')
+  }, [phase, supported, failed, enabled, onPhase])
 
   useEffect(() => {
-    if (!enabled || failed) resetInteraction()
-  }, [enabled, failed])
+    if (!enabled || failed || transitioning) resetInteraction()
+  }, [enabled, failed, transitioning])
 
   const fallback = <StaticArt />
   return (
@@ -204,9 +206,9 @@ export default function HeroArt({
                 rotation={rotation}
                 pointer={pointer}
                 onFailure={() => setFailed(true)}
-                opening={opening}
+                phase={phase}
                 onStage={onStage}
-                onComplete={onComplete}
+                onPhase={onPhase}
               />
             </Suspense>
           </ArtBoundary>
@@ -217,6 +219,7 @@ export default function HeroArt({
       {interactive && (
         <button
           className="galaxy-interaction"
+          disabled={transitioning}
           aria-label="은하 회전: 마우스 이동 방향으로 별들이 흐릅니다. 드래그하거나 방향키로 회전하면 해당 각도가 유지됩니다. Enter를 누르면 기준 각도로 돌아옵니다."
           data-dragging={dragging}
           onPointerDown={(event) => {

@@ -10,6 +10,13 @@ import {
 } from 'three'
 import { createGalaxy } from '../lib/galaxy'
 import {
+  GALAXY_BURST,
+  GALAXY_INTRO,
+  advanceGalaxyIntro,
+  getGalaxyIntroFrame,
+  type HeroPhase,
+} from '../lib/galaxyIntro'
+import {
   GALAXY_FLOW,
   createGalaxyMotion,
   stepGalaxyMotion,
@@ -21,8 +28,11 @@ const vertexShader = `
   uniform float uTime;
   uniform float uAssembly;
   uniform float uProgress;
+  uniform float uBurst;
+  uniform float uGather;
   uniform float uDpr;
   attribute vec2 aOffset;
+  attribute vec3 aScatter;
   attribute float aSeed;
   attribute float aRadius;
   attribute float aSize;
@@ -46,6 +56,10 @@ const vertexShader = `
       p.z += sin(uTime * ${GALAXY_FLOW.wobbleSpeed} + aSeed * ${GALAXY_FLOW.wobblePhase.toFixed(1)}) * ${GALAXY_FLOW.wobble};
       p += normalize(position + .001) * uProgress * aRadius * ${GALAXY_FLOW.scatter};
       vAlpha = 1. - smoothstep(uAssembly * 1.4 - .35, uAssembly * 1.4 + .08, aRadius);
+      float delay = (aRadius * .55 + aSeed * .45) * ${GALAXY_BURST.stagger};
+      float burst = uBurst * (1. - smoothstep(delay, delay + ${GALAXY_BURST.travel}, uGather));
+      p += aScatter * burst;
+      vAlpha *= aCore > .5 ? 1. - smoothstep(0., .32, burst) : 1. - burst * .35;
     } else {
       vAlpha = .35 + .35 * sin(uTime * .35 + aSeed * 50.);
     }
@@ -88,7 +102,11 @@ const fragmentShader = `
   }
 `
 
-type IntroProps = { opening: boolean; onStage: (stage: number) => void; onComplete: () => void }
+type IntroProps = {
+  phase: HeroPhase
+  onStage: (stage: number) => void
+  onPhase: (phase: HeroPhase) => void
+}
 type Rotation = RefObject<GalaxyRotation>
 type Pointer = RefObject<GalaxyPointer>
 
@@ -97,9 +115,9 @@ function GalaxyField({
   rotation,
   pointer,
   compact,
-  opening,
+  phase,
   onStage,
-  onComplete,
+  onPhase,
 }: {
   progress: RefObject<number>
   rotation: Rotation
@@ -108,10 +126,10 @@ function GalaxyField({
 } & IntroProps) {
   const points = useRef<Points>(null)
   const offsets = useRef<BufferAttribute>(null)
-  const elapsed = useRef(0)
+  const elapsed = useRef(phase === 'ready' ? GALAXY_INTRO.finishAt : 0)
   const lastStage = useRef(-1)
-  const finished = useRef(false)
-  const wasOpening = useRef(opening)
+  const lastPhase = useRef(phase)
+  const resuming = useRef(true)
   const [field] = useState(() => createGalaxy(compact))
   const [motion] = useState(() => createGalaxyMotion(field.seeds.length))
   const [projection] = useState(() => new Matrix4())
@@ -127,34 +145,41 @@ function GalaxyField({
         blending: AdditiveBlending,
         uniforms: {
           uTime: { value: 0 },
-          uAssembly: { value: opening ? 0 : 1 },
+          uAssembly: { value: phase === 'ready' ? 1 : 0 },
           uProgress: { value: 0 },
+          uBurst: { value: 0 },
+          uGather: { value: 0 },
           uDpr: { value: 1 },
         },
       }),
   )
   useEffect(() => () => material.dispose(), [material])
+  useEffect(() => {
+    const resume = () => {
+      resuming.current = true
+    }
+    document.addEventListener('visibilitychange', resume)
+    return () => document.removeEventListener('visibilitychange', resume)
+  }, [])
   useFrame((state, delta) => {
     const step = Math.min(delta, 0.05)
-    if (opening && !wasOpening.current) {
-      elapsed.current = 0
-      finished.current = false
-      lastStage.current = -1
+    elapsed.current =
+      phase === 'ready'
+        ? GALAXY_INTRO.finishAt
+        : advanceGalaxyIntro(elapsed.current, delta, resuming.current)
+    resuming.current = false
+    const intro = getGalaxyIntroFrame(elapsed.current)
+    material.uniforms.uAssembly.value = intro.assembly
+    material.uniforms.uBurst.value = intro.burst
+    material.uniforms.uGather.value = intro.gather
+    if (intro.stage !== lastStage.current) {
+      lastStage.current = intro.stage
+      onStage(intro.stage)
     }
-    wasOpening.current = opening
-    if (opening && !finished.current) {
-      elapsed.current += step
-      material.uniforms.uAssembly.value = Math.min(1, elapsed.current / 5.2)
-      const stage = Math.min(2, Math.floor(elapsed.current / 2.2))
-      if (stage !== lastStage.current) {
-        lastStage.current = stage
-        onStage(stage)
-      }
-      if (elapsed.current >= 7.2) {
-        finished.current = true
-        onComplete()
-      }
-    } else material.uniforms.uAssembly.value = 1
+    if (intro.phase !== lastPhase.current) {
+      lastPhase.current = intro.phase
+      onPhase(intro.phase)
+    }
     material.uniforms.uTime.value += step
     material.uniforms.uDpr.value = state.gl.getPixelRatio()
     const damping = 1 - Math.exp(-delta * 5)
@@ -185,7 +210,10 @@ function GalaxyField({
         matrix: projection.elements,
         pointer: pointer.current,
         scrolling:
-          scrollCooldown.current > 0 || performance.now() - pointer.current.lastScrollAt < 150,
+          intro.phase === 'scattering' ||
+          intro.phase === 'gathering' ||
+          scrollCooldown.current > 0 ||
+          performance.now() - pointer.current.lastScrollAt < 150,
       })
       if (changed && offsets.current) offsets.current.needsUpdate = true
     }
@@ -194,6 +222,7 @@ function GalaxyField({
     <points ref={points} material={material} rotation={[0.48, -0.18, -0.3]}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" args={[field.positions, 3]} />
+        <bufferAttribute attach="attributes-aScatter" args={[field.scatter, 3]} />
         <bufferAttribute attach="attributes-aSeed" args={[field.seeds, 1]} />
         <bufferAttribute attach="attributes-aRadius" args={[field.radii, 1]} />
         <bufferAttribute attach="attributes-aSize" args={[field.sizes, 1]} />
@@ -216,9 +245,9 @@ export default function ParticleCanvas({
   rotation,
   pointer,
   onFailure,
-  opening,
+  phase,
   onStage,
-  onComplete,
+  onPhase,
 }: {
   visible: boolean
   progress: RefObject<number>
@@ -249,9 +278,9 @@ export default function ParticleCanvas({
         rotation={rotation}
         pointer={pointer}
         compact={compact}
-        opening={opening}
+        phase={phase}
         onStage={onStage}
-        onComplete={onComplete}
+        onPhase={onPhase}
       />
     </Canvas>
   )

@@ -6,6 +6,7 @@ export function createGalaxy(compact: boolean) {
   const sizes = new Float32Array(count)
   const background = new Float32Array(count)
   const core = new Float32Array(count)
+  const scatter = new Float32Array(count * 3)
   let seed = 8701
   const random = () => {
     seed = (seed * 16807) % 2147483647
@@ -37,10 +38,19 @@ export function createGalaxy(compact: boolean) {
     sizes[i] = isBackground ? 0.7 + random() * 2 : 0.85 + Math.pow(random(), 8) * 19
     background[i] = isBackground ? 1 : 0
   }
+  // Keep the original galaxy distribution stable while giving each star its own exit path.
+  for (let i = 0; i < count - 1; i++) {
+    if (background[i]) continue
+    const angle = Math.atan2(positions[i * 3 + 1], positions[i * 3]) + (random() - 0.5) * 0.8
+    const distance = 4.5 + Math.sqrt(random()) * 7
+    scatter[i * 3] = Math.cos(angle) * distance
+    scatter[i * 3 + 1] = Math.sin(angle) * distance * 0.8
+    scatter[i * 3 + 2] = -1 - random() * 3.5
+  }
   // A single soft sprite supplies the core bloom without a full-screen postprocessing pass.
   positions.set([0, 0, 0], (count - 1) * 3)
   radii[count - 1] = 0
   background[count - 1] = 0
   core[count - 1] = 1
-  return { positions, seeds, radii, sizes, background, core }
+  return { positions, seeds, radii, sizes, background, core, scatter }
 }
